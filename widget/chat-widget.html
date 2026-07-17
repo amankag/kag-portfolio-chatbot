@@ -1,0 +1,140 @@
+<!--
+  Aman Kag Portfolio Chatbot Widget
+  ----------------------------------
+  Drop this markup + script into your portfolio site (e.g. just before
+  </body>). Update API_URL and SITE below for each site.
+
+  IT support site -> SITE = "it"
+  Data science site -> SITE = "ds"
+-->
+
+<div id="akc-widget">
+  <button id="akc-toggle" aria-label="Chat with Aman's assistant">💬 Ask about Aman</button>
+
+  <div id="akc-panel" class="akc-hidden">
+    <div id="akc-header">
+      <span>Ask about Aman</span>
+      <button id="akc-close" aria-label="Close chat">×</button>
+    </div>
+    <div id="akc-messages"></div>
+    <div id="akc-input-row">
+      <input id="akc-input" type="text" placeholder="Ask a question..." maxlength="500" />
+      <button id="akc-send">Send</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  #akc-widget { position: fixed; bottom: 20px; right: 20px; z-index: 9999; font-family: system-ui, -apple-system, sans-serif; }
+  #akc-toggle {
+    background: #1F3864; color: #fff; border: none; border-radius: 999px;
+    padding: 12px 18px; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+  #akc-toggle:hover { background: #16294a; }
+  #akc-panel {
+    position: absolute; bottom: 60px; right: 0; width: 340px; max-width: 90vw; height: 460px;
+    background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #akc-panel.akc-hidden { display: none; }
+  #akc-header {
+    background: #1F3864; color: #fff; padding: 12px 14px; font-weight: 600;
+    display: flex; justify-content: space-between; align-items: center; font-size: 14px;
+  }
+  #akc-close { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; line-height: 1; }
+  #akc-messages { flex: 1; overflow-y: auto; padding: 12px; font-size: 13px; }
+  .akc-msg { margin-bottom: 10px; line-height: 1.4; }
+  .akc-msg.user { text-align: right; }
+  .akc-bubble { display: inline-block; padding: 8px 12px; border-radius: 12px; max-width: 85%; }
+  .akc-msg.user .akc-bubble { background: #1F3864; color: #fff; }
+  .akc-msg.bot .akc-bubble { background: #F2F2F2; color: #222; }
+  .akc-msg.typing .akc-bubble { color: #888; font-style: italic; }
+  #akc-input-row { display: flex; border-top: 1px solid #eee; }
+  #akc-input { flex: 1; border: none; padding: 10px 12px; font-size: 13px; outline: none; }
+  #akc-send { border: none; background: #1F3864; color: #fff; padding: 0 16px; cursor: pointer; font-size: 13px; }
+  #akc-send:hover { background: #16294a; }
+  #akc-send:disabled { background: #999; cursor: not-allowed; }
+</style>
+
+<script>
+(function () {
+  // ---- CONFIGURE PER SITE ----
+  const API_URL = "https://kag-portfolio-chatbot.onrender.com/chat";
+  const SITE = "it"; // "it" for IT support site, "ds" for data science site
+  // -----------------------------
+
+  const toggle = document.getElementById("akc-toggle");
+  const panel = document.getElementById("akc-panel");
+  const closeBtn = document.getElementById("akc-close");
+  const messages = document.getElementById("akc-messages");
+  const input = document.getElementById("akc-input");
+  const sendBtn = document.getElementById("akc-send");
+
+  let greeted = false;
+
+  function addMessage(text, sender) {
+    const row = document.createElement("div");
+    row.className = "akc-msg " + sender;
+    const bubble = document.createElement("div");
+    bubble.className = "akc-bubble";
+    bubble.textContent = text;
+    row.appendChild(bubble);
+    messages.appendChild(row);
+    messages.scrollTop = messages.scrollHeight;
+    return row;
+  }
+
+  toggle.addEventListener("click", () => {
+    panel.classList.toggle("akc-hidden");
+    if (!greeted) {
+      greeted = true;
+      addMessage(
+        SITE === "it"
+          ? "Hi! Ask me anything about Aman's IT support experience, skills, or projects."
+          : "Hi! Ask me anything about Aman's data science projects, skills, or background.",
+        "bot"
+      );
+    }
+  });
+  closeBtn.addEventListener("click", () => panel.classList.add("akc-hidden"));
+
+  async function sendMessage() {
+    const text = input.value.trim();
+    if (!text) return;
+    addMessage(text, "user");
+    input.value = "";
+    sendBtn.disabled = true;
+
+    const typingRow = addMessage("Thinking...", "typing bot");
+
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, site: SITE }),
+      });
+
+      typingRow.remove();
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        addMessage(err.detail || "Something went wrong. Please try again shortly.", "bot");
+        return;
+      }
+
+      const data = await res.json();
+      addMessage(data.reply, "bot");
+    } catch (e) {
+      typingRow.remove();
+      addMessage("Couldn't reach the server. Please try again later.", "bot");
+    } finally {
+      sendBtn.disabled = false;
+    }
+  }
+
+  sendBtn.addEventListener("click", sendMessage);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendMessage();
+  });
+})();
+</script>
