@@ -112,10 +112,8 @@ class RAGEngine:
             )
         self.groq_client = Groq(api_key=groq_api_key)
 
-        logger.info("Loading embedding model '%s'...", EMBEDDING_MODEL_NAME)
-        self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name=EMBEDDING_MODEL_NAME
-        )
+        logger.info("Loading embedding model '%s' (ONNX runtime)...", EMBEDDING_MODEL_NAME)
+        self.embedding_fn = embedding_functions.ONNXMiniLM_L6_V2()
 
         # In-memory client; collections rebuild from knowledge_base.py on
         # every startup, no persistence needed at this scale.
