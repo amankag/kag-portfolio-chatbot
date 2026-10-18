@@ -18,7 +18,7 @@ from app.knowledge_base import KNOWLEDGE_BASES
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("rag_engine")
 
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 TOP_K = 3
 # Above this distance, retrieval is considered weak; model is told to
