@@ -1,120 +1,299 @@
-# Aman Kag Portfolio Chatbot (RAG Backend)
+# Aman Kag Portfolio Chatbot
 
-A single FastAPI backend that powers two "chat with my portfolio" bots:
-- **IT Support bot** — trained on the Service Desk / Desktop Support resume
-- **Data Science bot** — trained on the Data Science resume
+A production-deployed **Retrieval-Augmented Generation (RAG) chatbot** that allows visitors to explore my professional experience, technical skills, and projects through natural-language conversations.
 
-Both share the same code and infrastructure, but use isolated knowledge bases
-and system prompts, selected per-request via a `"site": "it"` or `"site": "ds"`
-field.
+A single FastAPI backend powers two portfolio assistants:
 
-## How it works
+- **IT Support Assistant** — focused on Service Desk, Desktop Support, infrastructure, troubleshooting, and IT experience.
+- **Data Science Assistant** — focused on Data Science, Machine Learning, analytics, cloud, and technical projects.
 
-1. `app/knowledge_base.py` — your resume content, pre-split into clean,
-   topic-focused chunks (one per skill area, job, project, etc.)
-2. On startup, each chunk is embedded (via `sentence-transformers`,
-   `all-MiniLM-L6-v2`, free/local) and stored in an in-memory Chroma vector
-   store — one collection for "it", one for "ds".
-3. On each `/chat` request: embed the visitor's question → retrieve the top 3
-   most relevant chunks from the right collection → send those chunks +
-   question to Groq's `llama-3.3-70b-versatile` → return the answer.
-4. If the best-matching chunk isn't a close match, the model is told to be
-   upfront about not knowing rather than guessing, or ask a clarifying
-   question.
+Both assistants share the same backend architecture while maintaining **isolated knowledge bases and system prompts**, selected dynamically using the `site` parameter.
 
-## 1. Local setup
+---
 
-```bash
-cd portfolio-chatbot
-python3 -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+## Architecture
 
-cp .env.example .env
-# then edit .env and paste your free Groq API key (console.groq.com)
+```text
+Portfolio Website
+       │
+       ▼
+JavaScript Chat Widget
+       │
+       ▼
+FastAPI /chat API
+       │
+       ▼
+Semantic Retrieval
+       │
+       ▼
+ChromaDB Vector Store
+       │
+       ▼
+Relevant Portfolio Context
+       │
+       ▼
+Groq — GPT-OSS 120B
+       │
+       ▼
+Grounded Response
 ```
 
-Run it:
+The chatbot uses RAG rather than sending the entire portfolio to the language model with every request. This allows the system to retrieve only the information most relevant to a visitor's question before generating a response.
+
+---
+
+## How It Works
+
+### 1. Knowledge Base
+
+Professional experience, skills, certifications, and projects are stored as topic-focused chunks in `app/knowledge_base.py`.
+
+Separate knowledge bases are maintained for the IT and Data Science portfolios.
+
+### 2. Local Embeddings
+
+At application startup, knowledge-base chunks are converted into vector embeddings using `all-MiniLM-L6-v2` and stored in isolated **ChromaDB** collections.
+
+This keeps the retrieval layer independent of the LLM API and avoids requiring a paid embedding service.
+
+### 3. Semantic Retrieval
+
+When a visitor submits a question, the backend:
+
+1. Identifies the requested portfolio (`it` or `ds`).
+2. Embeds the visitor's question.
+3. Searches the corresponding ChromaDB collection.
+4. Retrieves the three most relevant knowledge chunks.
+5. Adds those chunks as context for the language model.
+
+### 4. Response Generation
+
+The retrieved context and visitor question are sent to **GPT-OSS 120B through Groq**.
+
+The model generates a concise response grounded in the retrieved portfolio information. If retrieval confidence is weak, the assistant is instructed to acknowledge uncertainty rather than invent information.
+
+---
+
+## Key Features
+
+- Retrieval-Augmented Generation (RAG)
+- Semantic search using vector embeddings
+- Separate IT and Data Science knowledge bases
+- ChromaDB vector storage
+- Local MiniLM embeddings
+- GPT-OSS 120B inference through Groq
+- FastAPI REST backend
+- Reusable JavaScript chat widget
+- CORS protection
+- IP-based rate limiting
+- Retrieval-confidence fallback handling
+- Environment-based configuration
+- Cloud deployment on Render
+
+---
+
+## Tech Stack
+
+| Component | Technology |
+|---|---|
+| Backend | Python, FastAPI |
+| LLM | GPT-OSS 120B |
+| Inference | Groq |
+| Vector Database | ChromaDB |
+| Embeddings | all-MiniLM-L6-v2 |
+| Frontend Integration | JavaScript |
+| API Server | Uvicorn |
+| Deployment | Render |
+| Source Control | Git / GitHub |
+
+---
+
+## API
+
+### Endpoint
+
+```text
+POST /chat
+```
+
+### Example Request
+
+```json
+{
+  "message": "What experience does Aman have with AWS and data engineering?",
+  "site": "ds"
+}
+```
+
+The `site` field determines which knowledge base the RAG system searches. Supported values are `it` and `ds`.
+
+### Example Response
+
+```json
+{
+  "reply": "Response generated from the relevant portfolio context."
+}
+```
+
+---
+
+## Local Development
+
+Clone the repository and create a virtual environment:
+
+```bash
+git clone https://github.com/amankag/kag-portfolio-chatbot.git
+cd kag-portfolio-chatbot
+
+python3 -m venv venv
+source venv/bin/activate
+```
+
+On Windows:
+
+```bash
+venv\Scripts\activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Create the environment file:
+
+```bash
+cp .env.example .env
+```
+
+Add a Groq API key to `.env`:
+
+```text
+GROQ_API_KEY=your_api_key
+GROQ_MODEL=openai/gpt-oss-120b
+```
+
+Start the API:
 
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
-Test it:
+---
+
+## Testing the API
+
+### IT Portfolio
 
 ```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "What IT tools does Aman use?", "site": "it"}'
+  -d '{"message":"What IT tools does Aman use?","site":"it"}'
+```
 
+### Data Science Portfolio
+
+```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{"message": "Tell me about his machine learning projects", "site": "ds"}'
+  -d '{"message":"Tell me about Aman’s machine learning projects","site":"ds"}'
 ```
 
-> **Note on this build:** the code was written and syntax-checked, but not
-> run end-to-end in this environment due to a disk space limit (the
-> `sentence-transformers`/`torch` install is a few GB and didn't fit). Run the
-> local setup above once — if anything errors, paste it back to me and I'll
-> fix it immediately. This is a normal first-run step, not a sign something's
-> wrong with the code.
+---
 
-## 2. Deploy the backend for free (Render)
+## Rate Limiting
 
-1. Push this folder to a GitHub repo (e.g. `kag-portfolio-chatbot`).
-2. Go to [render.com](https://render.com) → New → Web Service → connect the repo.
-3. Settings:
-   - Build command: `pip install -r requirements.txt`
-   - Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-   - Instance type: Free
-4. Add environment variables in Render's dashboard (not in a committed `.env`):
-   - `GROQ_API_KEY` = your key
-   - `ALLOWED_ORIGINS` = your GitHub Pages URLs, comma-separated, e.g.
-     `https://amankag.github.io`
-5. Deploy. Render gives you a URL like `https://kag-chatbot.onrender.com`.
+The API includes IP-based rate limiting to prevent unnecessary API usage.
 
-Free-tier note: Render's free web services spin down after inactivity and
-take ~30-60 seconds to wake on the next request. Fine for a portfolio site;
-just know the first message after idle time will feel slow. Railway is a
-similar free-tier alternative if you'd rather avoid that cold start.
+Current configuration:
 
-## 3. Add the widget to each portfolio site
+- 15 requests per visitor
+- 10-minute rolling window
 
-Open `widget/chat-widget.html`, and for **each** site:
+The limits are configurable through `RATE_LIMIT_MAX_REQUESTS` and `RATE_LIMIT_WINDOW_SECONDS` in `app/main.py`.
 
-1. Set `API_URL` to your deployed Render URL + `/chat`.
-2. Set `SITE` to `"it"` on the IT support site, `"ds"` on the data science site.
-3. Paste the whole file's contents just before `</body>` on that site.
+---
 
-That's the only difference between the two deployments — same widget file,
-two different `SITE` values.
+## Updating Portfolio Knowledge
 
-## 4. Rate limiting
+The chatbot does not require model retraining when portfolio information changes.
 
-Already built in: 15 messages per visitor IP per 10-minute window
-(`app/main.py`, `RATE_LIMIT_MAX_REQUESTS` / `RATE_LIMIT_WINDOW_SECONDS`).
-Well within Groq's free-tier caps even with several visitors chatting at
-once. Adjust if you want it looser or stricter.
+Content can be updated directly in `app/knowledge_base.py`. When the application restarts, embeddings and ChromaDB collections are rebuilt automatically from the updated knowledge base.
 
-## 5. Updating your info later
+---
 
-Just edit the relevant chunks in `app/knowledge_base.py` and redeploy —
-no retraining, no separate embedding step to run manually, it rebuilds
-automatically on startup.
+## Model Migration
 
-## File structure
+The chatbot was originally built using **Llama 3.3 70B Versatile through Groq**.
 
-```
-portfolio-chatbot/
+Following the model's decommissioning in 2026, the generation layer was migrated to `openai/gpt-oss-120b`.
+
+Because the LLM is configured independently from the retrieval and embedding layers, the model could be replaced without redesigning the RAG architecture. This separation makes the system easier to maintain as inference models and APIs evolve.
+
+---
+
+## Project Structure
+
+```text
+kag-portfolio-chatbot/
 ├── app/
 │   ├── __init__.py
-│   ├── knowledge_base.py   # your resume content, chunked
-│   ├── rag_engine.py       # embeddings, retrieval, Groq generation
-│   └── main.py             # FastAPI app + /chat endpoint + rate limiting
+│   ├── knowledge_base.py
+│   ├── rag_engine.py
+│   └── main.py
+│
 ├── widget/
-│   └── chat-widget.html    # drop-in chat widget for your portfolio sites
+│   └── chat-widget.html
+│
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
 └── README.md
 ```
+
+### Core Components
+
+**`knowledge_base.py`** — Contains structured portfolio information for semantic retrieval.
+
+**`rag_engine.py`** — Handles embeddings, ChromaDB collections, semantic retrieval, context construction, and Groq generation.
+
+**`main.py`** — Provides the FastAPI application, `/chat` endpoint, CORS configuration, validation, and rate limiting.
+
+**`chat-widget.html`** — Reusable frontend chatbot interface that connects the portfolio websites to the API.
+
+---
+
+## Design Decisions
+
+### One Backend, Multiple Portfolios
+
+Instead of deploying separate AI backends, both portfolio assistants use one API while maintaining isolated knowledge collections. This reduces duplicated infrastructure while preventing information from one portfolio from being unintentionally retrieved for the other.
+
+### Local Embeddings
+
+Embeddings are generated locally rather than through an external embedding API. This reduces external dependencies and keeps semantic retrieval inexpensive.
+
+### Retrieval Before Generation
+
+Only relevant portfolio information is supplied to the language model. This reduces unnecessary context and helps keep responses grounded in known information.
+
+### Model-Independent Architecture
+
+Retrieval, embeddings, and generation are separated so the underlying LLM can be replaced without rebuilding the entire application.
+
+---
+
+## Deployment
+
+The FastAPI backend is deployed as a **Render Web Service**.
+
+Production configuration, including API credentials, is stored using environment variables rather than committed to the repository. The frontend portfolio sites communicate with the backend through the `/chat` API.
+
+---
+
+## Author
+
+**Aman Kag**
+
+This project was built as part of my portfolio to demonstrate practical experience with **Python APIs, RAG systems, semantic search, vector databases, LLM integration, deployment, and frontend/backend integration**.
