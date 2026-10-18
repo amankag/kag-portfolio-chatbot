@@ -162,7 +162,6 @@ class RAGEngine:
             ],
             max_tokens=500,
             temperature=0.4,
-            reasoning_effort="low",
         )
         reply = response.choices[0].message.content
         if not reply or not reply.strip():
