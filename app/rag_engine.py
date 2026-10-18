@@ -160,10 +160,15 @@ class RAGEngine:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content},
             ],
-            max_tokens=90,
+            max_tokens=500,
             temperature=0.4,
+            reasoning_effort="low",
         )
-        return response.choices[0].message.content
+        reply = response.choices[0].message.content
+        if not reply or not reply.strip():
+            logger.warning("Groq returned an empty response.")
+            return "Sorry, I couldn't generate a response. Please try again."
+        return reply.strip()
 
 
 # Singleton instance, created once at app startup (see main.py)
